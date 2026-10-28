@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>拍拍喵 Slapurr · Web Demo</title>
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, #FFF7EA, #FFE4BC);
+    padding: 24px;
+  }
+  .card {
+    width: 100%; max-width: 420px;
+    background: rgba(255,255,255,.72);
+    border-radius: 24px; padding: 32px 28px;
+    box-shadow: 0 12px 40px rgba(91,58,41,.14);
+    text-align: center;
+  }
+  h1 { font-size: 26px; color: #5B3A29; margin-bottom: 6px; }
+  .slogan { color: #B07A4E; font-size: 14px; margin-bottom: 22px; }
+  .big { font-size: 64px; line-height: 1.2; min-height: 78px; }
+  .caption { min-height: 22px; color: #8A6A50; font-size: 15px; margin-bottom: 18px; }
+  button.start {
+    border: 0; cursor: pointer; font-size: 17px; font-weight: 600;
+    color: #fff; background: #E8837B;
+    padding: 13px 30px; border-radius: 999px;
+    box-shadow: 0 6px 18px rgba(232,131,123,.4);
+    transition: transform .12s;
+  }
+  button.start:active { transform: scale(.96); }
+  button.start:disabled { opacity: .55; cursor: default; }
+  .row { display: flex; align-items: center; gap: 10px; margin-top: 20px; text-align: left; }
+  .row label { color: #5B3A29; font-size: 14px; white-space: nowrap; }
+  .row input[type=range] { flex: 1; accent-color: #E8837B; }
+  .stats { margin-top: 18px; color: #5B3A29; font-size: 14px; min-height: 20px; }
+  .privacy { margin-top: 16px; color: #A08670; font-size: 12px; line-height: 1.6; }
+  code { background: rgba(91,58,41,.08); padding: 1px 6px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>拍拍喵 Slapurr 🐱</h1>
+  <div class="slogan">拍一下你的电脑，它就喵一声 · Tap it, it purrs</div>
+  <div class="big" id="emoji">🐱</div>
+  <div class="caption" id="caption">网页版也能被拍喵（演示检测算法用）</div>
+  <button class="start" id="start">开始监听 🎤</button>
+  <div class="row">
+    <label for="sens">灵敏度</label>
+    <input type="range" id="sens" min="0" max="1" step="0.05" value="0.5">
+  </div>
+  <div class="stats" id="stats">还没被拍过</div>
+  <div class="privacy">
+    声音只在浏览器内存里瞬时识别：不录音、不存储、不上传。<br>
+    完整 macOS 版（触感反馈 + 成就 + 真猫咕噜）见仓库 <code>slapurr-glm</code>。
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ---- 检测器：SlapurrCore.SlapDetector 的 JS 移植（参数与 Swift 版一致） ----
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+class SlapDetector {
+  constructor(sensitivityValue) {
+    this.sensitivityValue = sensitivityValue;
+    this.refractory = 0.35;
+    this.spectralGate = 0.2;
+    this.forceReference = 0.25;
+    this.noiseFloor = 2e-4;
+    this.prevRMS = 0;
+    this.lowpass = 0;
+    this.processedSamples = 0;
+    this.lastTriggerTime = -1e9;
+  }
+  static ratio(v) { return Math.exp(lerp(Math.log(16.0), Math.log(4.5), v)); }
+  static absFloor(v) { return Math.exp(lerp(Math.log(0.08), Math.log(0.012), v)); }
+  process(samples, sampleRate) {
+    if (!(sampleRate > 0)) return null;
+    let energy = 0, lpEnergy = 0, count = 0;
+    const alpha = 1 - Math.exp((-2 * Math.PI * 200) / sampleRate);
+    for (let i = 0; i < samples.length; i++) {
+      const v = samples[i];
+      energy += v * v;
+      this.lowpass += alpha * (v - this.lowpass);
+      lpEnergy += this.lowpass * this.lowpass;
+      count++;
+    }
+    if (count === 0) return null;
+    const rms = Math.sqrt(energy / count);
+    const lowFreqRatio = Math.sqrt(lpEnergy / count) / Math.max(rms, 1e-9);
+    const time = this.processedSamples / sampleRate;
+    const isFirstChunk = this.processedSamples === 0;
+    this.processedSamples += count;
+    const prevRMS = this.prevRMS;
+    this.prevRMS = rms;
+    this.noiseFloor = Math.max(0.95 * this.noiseFloor + 0.05 * rms, 1e-5);
+    if (isFirstChunk) return null; // 暖机：开局不叫
+    const hit =
+      time - this.lastTriggerTime >= this.refractory &&
+      rms > this.noiseFloor * SlapDetector.ratio(this.sensitivityValue) &&
+      rms > SlapDetector.absFloor(this.sensitivityValue) &&
+      lowFreqRatio >= this.spectralGate &&
+      rms > prevRMS * 2.2;
+    if (!hit) return null;
+    this.lastTriggerTime = time;
+    return Math.min(rms / this.forceReference, 1.0);
+  }
+}
+
+// ---- 合成喵叫：gen_sounds.py meow() 的 JS 移植（同参数同轮廓） ----
+function synthMeow(ctx, base) {
+  const sr = ctx.sampleRate;
+  const dur = 0.7;
+  const n = Math.floor(sr * dur);
+  const buf = ctx.createBuffer(1, n, sr);
+  const out = buf.getChannelData(0);
+  let phase = 0, peak = 0, seed = 7;
+  const rand = () => {
+    seed = (seed * 1103515245 + 12345) >>> 0;
+    return (seed / 4294967296) * 2 - 1;
+  };
+  for (let i = 0; i < n; i++) {
+    const t = i / sr, p = t / dur;
+    let ratio;
+    if (p < 0.35) ratio = 1 + 0.62 * Math.pow(p / 0.35, 0.8);
+    else if (p < 0.62) ratio = 1.62 + 0.04 * Math.sin(2 * Math.PI * 11 * t);
+    else { const q = (p - 0.62) / 0.38; ratio = 1.66 * (1 - 0.62 * Math.pow(q, 1.3)); }
+    const f = base * ratio * (1 + 0.014 * Math.sin(2 * Math.PI * 6.5 * t));
+    phase += (2 * Math.PI * f) / sr;
+    let s = Math.sin(phase) + 0.52 * Math.sin(2 * phase) + 0.30 * Math.sin(3 * phase)
+          + 0.15 * Math.sin(4 * phase) + 0.08 * Math.sin(5 * phase);
+    if (p < 0.09) s += 0.35 * (p / 0.09) * rand();
+    let env = 1;
+    if (p < 0.05) env = p / 0.05;
+    else if (p > 0.7) env = Math.pow(Math.max(0, (1 - p) / 0.3), 1.2);
+    s = Math.tanh(1.4 * s) * env;
+    out[i] = s;
+    if (Math.abs(s) > peak) peak = Math.abs(s);
+  }
+  if (peak > 0) for (let i = 0; i < n; i++) out[i] = (0.85 * out[i]) / peak;
+  return buf;
+}
+
+// ---- 猫反应（与 SlapurrCore.CatReaction 同档位） ----
+function reaction(force) {
+  if (force < 0.35) return { emoji: "😺", caption: "轻一点嘛~" };
+  if (force < 0.8) return { emoji: "😸", caption: "喵！" };
+  return { emoji: "😿", caption: "疼疼疼！" };
+}
+
+// ---- 页面逻辑 ----
+const $ = (id) => document.getElementById(id);
+let ctx = null, meowBuffer = null, detector = new SlapDetector(0.5);
+let slapCount = 0, lastForce = null, hideTimer = null;
+
+$("sens").addEventListener("input", (e) => {
+  detector.sensitivityValue = parseFloat(e.target.value);
+});
+
+$("start").addEventListener("click", async () => {
+  const button = $("start");
+  button.disabled = true;
+  button.textContent = "请求麦克风…";
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    await ctx.resume();
+    meowBuffer = synthMeow(ctx, 520);
+    const source = ctx.createMediaStreamSource(stream);
+    const processor = ctx.createScriptProcessor(1024, 1, 1);
+    const mute = ctx.createGain();
+    mute.gain.value = 0;
+    source.connect(processor);
+    processor.connect(mute);
+    mute.connect(ctx.destination);
+    processor.onaudioprocess = (e) => {
+      const force = detector.process(e.inputBuffer.getChannelData(0), ctx.sampleRate);
+      if (force !== null) onSlap(force);
+    };
+    button.textContent = "监听中——拍一下你的电脑 🐱";
+  } catch (err) {
+    button.disabled = false;
+    button.textContent = "开始监听 🎤";
+    $("caption").textContent = "麦克风没开成：" + err.message;
+  }
+});
+
+function onSlap(force) {
+  slapCount++;
+  lastForce = force;
+  const r = reaction(force);
+  $("emoji").textContent = r.emoji;
+  $("caption").textContent = r.caption;
+  $("stats").textContent = "被拍了 " + slapCount + " 次 · 上次力度 " +
+    Math.round(force * 100) + "%";
+  playMeow(force);
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => { $("emoji").textContent = "🐱"; }, 700);
+}
+
+function playMeow(force) {
+  if (!ctx || !meowBuffer) return;
+  const player = ctx.createBufferSource();
+  const gain = ctx.createGain();
+  player.buffer = meowBuffer;
+  player.playbackRate.value = 0.85 + 0.55 * force; // 力度变调
+  gain.gain.value = Math.min(0.7 + 0.5 * force, 1.0);
+  player.connect(gain);
+  gain.connect(ctx.destination);
+  player.start();
+}
+</script>
+</body>
+</html>
