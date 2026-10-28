@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>拍拍喵 Slapurr — 拍一下你的 Mac，它就喵一声</title>
+<meta name="description" content="免费开源的 macOS 菜单栏小玩具：拍一下电脑，它就喵一声。力度不同，猫的心情不同。声音纯本地识别，不录音不上传。">
+<!--
+  部署说明（见 site/README.md）：
+  1. 把本目录（index.html）+ web/demo.html（改名 demo.html）+ 两个安装包放同一目录：
+     downloads/Slapurr-v0.2.0.dmg / downloads/Slapurr-v0.2.0.zip / demo.html
+  2. 整体拖到 Cloudflare Pages / GitHub Pages / 任意静态托管即可。
+-->
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: linear-gradient(180deg, #FFF7EA 0%, #FFE9C9 60%, #FFDFAF 100%);
+    color: #5B3A29; line-height: 1.7;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+
+  header { text-align: center; padding: 84px 24px 56px; }
+  .hero-cat { font-size: 88px; line-height: 1; display: inline-block; }
+  .hero-cat.smacked { transform: rotate(-8deg) scale(1.08); }
+  h1 { font-size: 40px; margin: 18px 0 8px; letter-spacing: .5px; }
+  .slogan { font-size: 19px; color: #A5703F; margin-bottom: 6px; }
+  .slogan-en { font-size: 14px; color: #C09B72; margin-bottom: 30px; }
+  .cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 13px 30px; border-radius: 999px;
+    font-size: 16px; font-weight: 600; text-decoration: none;
+    transition: transform .12s, box-shadow .12s;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn-primary { background: #E8837B; color: #fff; box-shadow: 0 8px 22px rgba(232,131,123,.45); }
+  .btn-ghost { background: rgba(255,255,255,.7); color: #5B3A29; border: 1.5px solid #E8C79B; }
+  .req { margin-top: 14px; font-size: 12.5px; color: #B7946E; }
+
+  section { padding: 44px 0; }
+  h2 { font-size: 24px; text-align: center; margin-bottom: 26px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card {
+    background: rgba(255,255,255,.68); border-radius: 18px; padding: 20px 22px;
+    box-shadow: 0 6px 18px rgba(91,58,41,.08);
+  }
+  .card .ic { font-size: 30px; }
+  .card b { display: block; margin: 6px 0 4px; font-size: 15.5px; }
+  .card p { font-size: 13.5px; color: #8A6A50; }
+
+  .steps { counter-reset: step; }
+  .step { display: flex; gap: 14px; align-items: flex-start; margin: 14px 0; }
+  .step::before {
+    counter-increment: step; content: counter(step);
+    flex: 0 0 34px; height: 34px; border-radius: 50%;
+    background: #E8837B; color: #fff; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step p { font-size: 15px; }
+
+  .faq details {
+    background: rgba(255,255,255,.6); border-radius: 14px;
+    padding: 14px 18px; margin-bottom: 10px;
+  }
+  .faq summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+  .faq p { font-size: 14px; color: #8A6A50; margin-top: 8px; }
+
+  footer { text-align: center; padding: 40px 24px 60px; font-size: 13px; color: #B7946E; }
+  footer a { color: #E8837B; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="hero-cat" id="cat">🐱</span>
+  <h1>拍拍喵 Slapurr</h1>
+  <div class="slogan">拍一下你的 Mac，它就喵一声。</div>
+  <div class="slogan-en">Tap it. It purrs. (Tap harder, it DRAMAS.)</div>
+  <div class="cta">
+    <a class="btn btn-primary" href="downloads/Slapurr-v0.2.0.dmg">⬇️ 下载 for macOS（免费）</a>
+    <a class="btn btn-ghost" href="demo.html">🎧 网页在线试玩</a>
+  </div>
+  <div class="req">macOS 13+ · 任何机型（Intel/Apple Silicon） · 免安装拖拽即用 · 开源 MIT</div>
+</header>
+
+<div class="wrap">
+
+  <section>
+    <h2>为什么好玩</h2>
+    <div class="grid">
+      <div class="card"><div class="ic">💥</div><b>力度即心情</b><p>轻拍轻喵、中拍正常喵、重拍惨叫——声音、表情、触控板震动三通道一起反应。</p></div>
+      <div class="card"><div class="ic">😻</div><b>摸它会咕噜</b><p>持续轻挠机身，它开始呼噜（真猫录音）；打字不会误触，只认「啪」级的拍击。</p></div>
+      <div class="card"><div class="ic">🏆</div><b>拍着拍着有成就</b><p>今日十连喵、百拍斩、全力一击……每日统计 + 成就系统，越拍越上头。</p></div>
+      <div class="card"><div class="ic">🎵</div><b>音效随你换</b><p>内置合成喵 + 真猫叫（CC0），支持导入自己的音频进轮换池。</p></div>
+      <div class="card"><div class="ic">🌐</div><b>中英双语</b><p>菜单一键切换，猫在两种语言里都很有礼貌。</p></div>
+      <div class="card"><div class="ic">🔒</div><b>隐私洁癖</b><p>声音只在本地内存瞬时识别：不录音、不存储、不上传——断网照样玩。</p></div>
+    </div>
+  </section>
+
+  <section class="steps">
+    <h2>三步开拍</h2>
+    <div class="step"><p><b>下载并拖进「应用程序」</b>——DMG 里拖一下就好，首次打开若被拦：右键 → 打开。</p></div>
+    <div class="step"><p><b>允许麦克风</b>——猫需要听一下拍击声，才知道你拍了它。</p></div>
+    <div class="step"><p><b>拍一下掌托</b>——菜单栏的猫会换表情，屏幕冒气泡，然后喵。灵敏度随时可调。</p></div>
+  </section>
+
+  <section class="faq">
+    <h2>常见问题</h2>
+    <details><summary>会上传我的声音吗？</summary><p>不会。识别在你电脑内存里瞬时完成，代码开源可查（MIT）。断网也能玩。</p></details>
+    <details><summary>会不会识别成打字声？</summary><p>专门做了键盘抑制：拍击是低频「砰」，键击是高频「嗒」，算法只认前者。极灵敏档可能偶尔叫，调低即可。</p></details>
+    <details><summary>我的机型支持吗？</summary><p>macOS 13+ 全机型支持——用麦克风听拍击，不依赖加速度计，Intel 老 Mac 也能玩。</p></details>
+    <details><summary>有 Windows / 网页版吗？</summary><p>网页试玩版全平台可用（本页「在线试玩」）；Windows 原生版路线图里，先玩 Mac 版和网页版吧。</p></details>
+    <details><summary>为什么免费？</summary><p>图一乐的项目，开源（MIT）让大家放心玩、随便改。喜欢的话去仓库点个 Star 就是最好的支持。</p></details>
+    <details><summary>会把电脑拍坏吗？</summary><p>建议用肉掌轻拍掌托，别用家伙事儿——猫疼，电脑也疼。</p></details>
+  </section>
+
+</div>
+
+<footer>
+  灵感致敬 <a href="https://slapmac.com">SlapMac</a> · 音效含 CC0 素材（<a href="https://commons.wikimedia.org/wiki/File:Meow_of_a_Siamese_cat_-_freemaster2.wav">Wikimedia Commons</a>）·
+  开源 <a href="https://github.com/anmutu/slapurr">GitHub</a>（MIT）<br>
+  拍拍喵 Slapurr · 声音纯本地 · made with 🐾
+</footer>
+
+<script>
+  // 点猫：被拍表情彩蛋
+  const cat = document.getElementById('cat');
+  const faces = ['😹', '😸', '😻', '🐱'];
+  cat.addEventListener('click', () => {
+    cat.classList.add('smacked');
+    cat.textContent = faces[Math.floor(Math.random() * faces.length)];
+    setTimeout(() => { cat.classList.remove('smacked'); cat.textContent = '🐱'; }, 600);
+  });
+</script>
+</body>
+</html>
